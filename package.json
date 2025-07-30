@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "scripts": {
+    "start": "python app.py",
+    "dev": "FLASK_DEBUG=true python app.py",
+    "install": "pip install -r requirements.txt",
+    "test": "python -m pytest tests/ -v",
+    "lint": "flake8 app.py"
+  },
+  "dependencies": {
+    "python": ">=3.8"
+  },
+  "engines": {
+    "python": "3.11"
+  }
+}

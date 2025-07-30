@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - サーバーエラー | Demo11</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="error-page">
+        <div class="container">
+            <div class="error-content">
+                <i class="fas fa-server error-icon"></i>
+                <h1>500</h1>
+                <h2>サーバーエラー</h2>
+                <p>申し訳ございません。サーバーで問題が発生しました。</p>
+                <a href="/" class="btn-primary">
+                    <i class="fas fa-home"></i> ホームに戻る
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
