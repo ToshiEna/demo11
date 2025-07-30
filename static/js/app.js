@@ -536,6 +536,369 @@ function displayBulkResults(data) {
     document.getElementById('bulk-results').innerHTML = html;
 }
 
+// Additional utility functions
+function filterSKUsByDepartment() {
+    const selectedDept = document.getElementById('dept-select').value;
+    if (!selectedDept || !app.storeSKUs) return;
+    
+    const filteredSKUs = app.storeSKUs.filter(sku => sku.dept === selectedDept);
+    const container = document.getElementById('dept-skus');
+    displaySKUSelection(filteredSKUs, container);
+}
+
+function adjustPrediction(sku) {
+    app.showNotification(`予測調整機能 - SKU: ${sku}`, 'info');
+    // TODO: Implement prediction adjustment interface
+}
+
+function exportBulkResults() {
+    app.showNotification('エクスポート機能を実装中...', 'info');
+    // TODO: Implement CSV export functionality
+}
+
+function showPromotionCalendar() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-calendar">
+            <h4>プロモーションカレンダー</h4>
+            <p>プロモーションカレンダー機能を実装中...</p>
+        </div>
+    `;
+}
+
+function analyzePromotionImpact() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-analysis">
+            <h4>プロモーション効果分析</h4>
+            <p>プロモーション効果分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function planNewPromotion() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-planning">
+            <h4>新規プロモーション計画</h4>
+            <p>新規プロモーション計画機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showSalesAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="sales-analytics">
+            <h4>売上分析</h4>
+            <p>売上分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showInventoryAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="inventory-analytics">
+            <h4>在庫分析</h4>
+            <p>在庫分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showSeasonalAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="seasonal-analytics">
+            <h4>季節性分析</h4>
+            <p>季節性分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+// Legacy Functions for Data Analyst Interface
+function showTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+
+    // Show selected tab content
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+
+    // Add active class to clicked button
+    const clickedButton = event.target.closest('.tab-button');
+    if (clickedButton) {
+        clickedButton.classList.add('active');
+    }
+}
+
+// Data Management Functions
+async function uploadCSV() {
+    const fileInput = document.getElementById('csv-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        app.showNotification('CSVファイルを選択してください', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/data/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            app.showNotification('データアップロード成功！', 'success');
+            document.getElementById('upload-result').innerHTML = `
+                <div class="success-message">
+                    <h4>アップロード成功!</h4>
+                    <p>${data.message}</p>
+                    <div class="enhanced-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-store"></i></div>
+                            <div class="stat-number">${data.statistics.unique_stores || 0}</div>
+                            <div class="stat-description">店舗数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                            <div class="stat-number">${data.statistics.unique_skus || 0}</div>
+                            <div class="stat-description">SKU数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-yen-sign"></i></div>
+                            <div class="stat-number">¥${(data.statistics.sales_stats?.total_sales || 0).toLocaleString()}</div>
+                            <div class="stat-description">総売上</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-tags"></i></div>
+                            <div class="stat-number">${data.statistics.promotion_stats?.total_promotion_days || 0}</div>
+                            <div class="stat-description">プロモーション日数</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Load stores after successful upload
+            app.loadStores();
+        } else {
+            app.showNotification(data.error || 'アップロード失敗', 'error');
+            document.getElementById('upload-result').innerHTML = `
+                <div class="error-message">エラー: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        app.showNotification('アップロード失敗', 'error');
+        document.getElementById('upload-result').innerHTML = `
+            <div class="error-message">アップロード失敗: ${error.message}</div>
+        `;
+    }
+}
+
+async function loadDataStatistics() {
+    try {
+        const response = await fetch('/api/data/statistics');
+        const data = await response.json();
+        
+        if (response.ok && data.total_records) {
+            document.getElementById('data-statistics').innerHTML = `
+                <div class="enhanced-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-database"></i></div>
+                        <div class="stat-number">${data.total_records}</div>
+                        <div class="stat-description">総レコード数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-store"></i></div>
+                        <div class="stat-number">${data.unique_stores || 0}</div>
+                        <div class="stat-description">店舗数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                        <div class="stat-number">${data.unique_skus || data.unique_products}</div>
+                        <div class="stat-description">SKU数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-building"></i></div>
+                        <div class="stat-number">${data.unique_divisions || 0}</div>
+                        <div class="stat-description">事業部数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="stat-number">${data.unique_departments || 0}</div>
+                        <div class="stat-description">部門数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-yen-sign"></i></div>
+                        <div class="stat-number">¥${(data.sales_stats?.total_sales || 0).toLocaleString()}</div>
+                        <div class="stat-description">総売上</div>
+                    </div>
+                </div>
+                <div class="stat-details">
+                    <h4>期間</h4>
+                    <p>${data.date_range?.start} ～ ${data.date_range?.end}</p>
+                    <h4>需要統計</h4>
+                    <p>平均: ${data.demand_stats?.mean?.toFixed(2)}, 最小: ${data.demand_stats?.min}, 最大: ${data.demand_stats?.max}</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('data-statistics').innerHTML = `
+                <div class="info-message">データがありません。まずデータをアップロードしてください。</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Statistics error:', error);
+        document.getElementById('data-statistics').innerHTML = `
+            <div class="error-message">統計読み込み失敗: ${error.message}</div>
+        `;
+    }
+}
+
+// Model Training Functions
+async function trainModel() {
+    document.getElementById('training-result').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> モデル訓練中... しばらくお待ちください。
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/model/train', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            app.showNotification('モデル訓練成功！', 'success');
+            document.getElementById('training-result').innerHTML = `
+                <div class="success-message">
+                    <h4>訓練成功!</h4>
+                    <div class="training-metrics">
+                        <p><strong>アクティブモデル:</strong> ${data.active_model}</p>
+                        <p><strong>訓練サンプル:</strong> ${data.training_samples}</p>
+                        <p><strong>テストサンプル:</strong> ${data.test_samples}</p>
+                        <pre>${JSON.stringify(data.metrics, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+            
+            // Refresh system status
+            app.loadSystemStatus();
+        } else {
+            app.showNotification(data.error || '訓練失敗', 'error');
+            document.getElementById('training-result').innerHTML = `
+                <div class="error-message">訓練失敗: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Training error:', error);
+        app.showNotification('訓練失敗', 'error');
+        document.getElementById('training-result').innerHTML = `
+            <div class="error-message">訓練失敗: ${error.message}</div>
+        `;
+    }
+}
+
+async function loadModelInfo() {
+    try {
+        const response = await fetch('/api/info');
+        const data = await response.json();
+        
+        if (response.ok) {
+            const modelInfo = data.model_info;
+            document.getElementById('model-info').innerHTML = `
+                <div class="model-info-display">
+                    <h4>モデル情報</h4>
+                    <div class="enhanced-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-number">${modelInfo.is_trained ? '訓練済み' : '未訓練'}</div>
+                            <div class="stat-description">ステータス</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-brain"></i></div>
+                            <div class="stat-number">${modelInfo.active_model || 'なし'}</div>
+                            <div class="stat-description">アクティブモデル</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-list"></i></div>
+                            <div class="stat-number">${modelInfo.available_models ? modelInfo.available_models.length : 0}</div>
+                            <div class="stat-description">利用可能モデル数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-columns"></i></div>
+                            <div class="stat-number">${modelInfo.feature_columns ? modelInfo.feature_columns.length : 0}</div>
+                            <div class="stat-description">特徴量数</div>
+                        </div>
+                    </div>
+                    ${modelInfo.metrics ? `<pre>${JSON.stringify(modelInfo.metrics, null, 2)}</pre>` : ''}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Model info error:', error);
+        document.getElementById('model-info').innerHTML = `
+            <div class="error-message">モデル情報読み込み失敗: ${error.message}</div>
+        `;
+    }
+}
+
+// Visualization Functions
+async function showChart(chartType) {
+    document.getElementById('chart-container').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> ${chartType.replace('_', ' ')} チャート生成中...
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/api/visualize/${chartType}`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            app.showNotification('チャート生成成功！', 'success');
+            
+            // Create a new div for the plot
+            const plotDiv = document.createElement('div');
+            plotDiv.id = 'plotly-chart';
+            plotDiv.style.width = '100%';
+            plotDiv.style.height = '500px';
+            
+            document.getElementById('chart-container').innerHTML = '';
+            document.getElementById('chart-container').appendChild(plotDiv);
+            
+            // Render the Plotly chart
+            Plotly.newPlot('plotly-chart', data.chart.data, data.chart.layout, {responsive: true});
+        } else {
+            app.showNotification(data.error || 'チャート生成失敗', 'error');
+            document.getElementById('chart-container').innerHTML = `
+                <div class="error-message">チャート生成失敗: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Chart error:', error);
+        app.showNotification('チャート生成失敗', 'error');
+        document.getElementById('chart-container').innerHTML = `
+            <div class="error-message">チャート生成失敗: ${error.message}</div>
+        `;
+    }
+}
+
 // Tab Functions
 function showTab(tabName) {
     // Hide all tab contents
