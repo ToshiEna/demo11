@@ -22,8 +22,11 @@ class DemandPredictionApp {
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             button.addEventListener('click', (e) => {
-                const tabName = e.target.getAttribute('onclick').match(/'(.*)'/)[1];
-                this.showTab(tabName);
+                const onclickAttr = e.target.getAttribute('onclick');
+                if (onclickAttr) {
+                    const tabName = onclickAttr.match(/'(.*)'/)[1];
+                    showTab(tabName);
+                }
             });
         });
 
