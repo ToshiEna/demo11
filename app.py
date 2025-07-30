@@ -184,15 +184,43 @@ def upload_data():
             
             demand_data = []
             for item in data['data']:
-                demand_data.append(DemandData(
-                    date=datetime.fromisoformat(item['date'].replace('Z', '+00:00')),
-                    product_id=item['product_id'],
-                    demand_value=float(item['demand_value']),
-                    price=item.get('price'),
-                    promotion=item.get('promotion'),
-                    weather_condition=item.get('weather_condition'),
-                    seasonality_factor=item.get('seasonality_factor')
-                ))
+                # Handle both old and new format
+                if 'sales_date' in item:  # New retail format
+                    demand_data.append(DemandData(
+                        sales_date=datetime.fromisoformat(item['sales_date'].replace('Z', '+00:00')),
+                        store=item['store'],
+                        sku=item['sku'],
+                        desc=item.get('desc', ''),
+                        div=item.get('div', ''),
+                        div_desc=item.get('div_desc', ''),
+                        dept=item.get('dept', ''),
+                        dept_desc=item.get('dept_desc', ''),
+                        sold_qty=float(item['sold_qty']),
+                        act_sales=float(item['act_sales']),
+                        price=item.get('price'),
+                        promotion=item.get('promotion'),
+                        promotion_discount=item.get('promotion_discount'),
+                        weather_condition=item.get('weather_condition'),
+                        seasonality_factor=item.get('seasonality_factor')
+                    ))
+                else:  # Legacy format
+                    demand_data.append(DemandData(
+                        sales_date=datetime.fromisoformat(item['date'].replace('Z', '+00:00')),
+                        store=item.get('store', 'STORE_001'),
+                        sku=item['product_id'],
+                        desc=item.get('desc', ''),
+                        div=item.get('div', 'DIV_001'),
+                        div_desc=item.get('div_desc', ''),
+                        dept=item.get('dept', 'DEPT_001'),
+                        dept_desc=item.get('dept_desc', ''),
+                        sold_qty=float(item['demand_value']),
+                        act_sales=float(item.get('act_sales', item['demand_value'] * item.get('price', 10.0))),
+                        price=item.get('price'),
+                        promotion=item.get('promotion'),
+                        promotion_discount=item.get('promotion_discount'),
+                        weather_condition=item.get('weather_condition'),
+                        seasonality_factor=item.get('seasonality_factor')
+                    ))
         else:
             # Handle file upload
             file = request.files['file']
@@ -201,22 +229,63 @@ def upload_data():
             
             # Read CSV file
             df = pd.read_csv(file)
-            required_cols = ['date', 'product_id', 'demand_value']
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            if missing_cols:
-                return jsonify({'error': f'Missing required columns: {missing_cols}'}), 400
             
-            demand_data = []
-            for _, row in df.iterrows():
-                demand_data.append(DemandData(
-                    date=pd.to_datetime(row['date']),
-                    product_id=str(row['product_id']),
-                    demand_value=float(row['demand_value']),
-                    price=row.get('price'),
-                    promotion=row.get('promotion'),
-                    weather_condition=row.get('weather_condition'),
-                    seasonality_factor=row.get('seasonality_factor')
-                ))
+            # Check for new retail format
+            retail_cols = ['SALES DATE', 'STORE', 'SKU', 'SOLD QTY', 'ACT SALES']
+            has_retail_format = all(col in df.columns for col in retail_cols)
+            
+            if has_retail_format:
+                # New retail format
+                required_cols = ['SALES DATE', 'STORE', 'SKU', 'SOLD QTY', 'ACT SALES']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                if missing_cols:
+                    return jsonify({'error': f'Missing required columns: {missing_cols}'}), 400
+                
+                demand_data = []
+                for _, row in df.iterrows():
+                    demand_data.append(DemandData(
+                        sales_date=pd.to_datetime(row['SALES DATE']),
+                        store=str(row['STORE']),
+                        sku=str(row['SKU']),
+                        desc=str(row.get('DESC', '')),
+                        div=str(row.get('DIV', '')),
+                        div_desc=str(row.get('DIV DESC', '')),
+                        dept=str(row.get('DEPT', '')),
+                        dept_desc=str(row.get('DEPT DESC', '')),
+                        sold_qty=float(row['SOLD QTY']),
+                        act_sales=float(row['ACT SALES']),
+                        price=row.get('price') or (row['ACT SALES'] / max(row['SOLD QTY'], 1)),
+                        promotion=row.get('promotion', False),
+                        promotion_discount=row.get('promotion_discount', 0.0),
+                        weather_condition=row.get('weather_condition'),
+                        seasonality_factor=row.get('seasonality_factor')
+                    ))
+            else:
+                # Legacy format
+                required_cols = ['date', 'product_id', 'demand_value']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                if missing_cols:
+                    return jsonify({'error': f'Missing required columns: {missing_cols}'}), 400
+                
+                demand_data = []
+                for _, row in df.iterrows():
+                    demand_data.append(DemandData(
+                        sales_date=pd.to_datetime(row['date']),
+                        store=str(row.get('store', 'STORE_001')),
+                        sku=str(row['product_id']),
+                        desc=str(row.get('desc', '')),
+                        div=str(row.get('div', 'DIV_001')),
+                        div_desc=str(row.get('div_desc', '')),
+                        dept=str(row.get('dept', 'DEPT_001')),
+                        dept_desc=str(row.get('dept_desc', '')),
+                        sold_qty=float(row['demand_value']),
+                        act_sales=float(row.get('act_sales', row['demand_value'] * row.get('price', 10.0))),
+                        price=row.get('price'),
+                        promotion=row.get('promotion'),
+                        promotion_discount=row.get('promotion_discount'),
+                        weather_condition=row.get('weather_condition'),
+                        seasonality_factor=row.get('seasonality_factor')
+                    ))
         
         # Load data into processor
         success = data_processor.load_data(demand_data)
@@ -271,7 +340,164 @@ def train_model():
         logger.error(f"Model training error: {e}")
         return jsonify({'error': f'Training failed: {str(e)}'}), 500
 
-@app.route('/api/predict', methods=['POST'])
+@app.route('/api/stores')
+def get_stores():
+    """Get list of stores"""
+    if not PREDICTION_MODELS_AVAILABLE or data_processor is None:
+        return jsonify({'error': 'Data processor not available'}), 503
+    
+    if data_processor.data.empty:
+        return jsonify({'stores': []})
+    
+    stores = data_processor.data['store'].unique().tolist() if 'store' in data_processor.data.columns else []
+    return jsonify({'stores': stores})
+
+@app.route('/api/stores/<store_id>/skus')
+def get_store_skus(store_id):
+    """Get SKUs for a specific store"""
+    if not PREDICTION_MODELS_AVAILABLE or data_processor is None:
+        return jsonify({'error': 'Data processor not available'}), 503
+    
+    if data_processor.data.empty:
+        return jsonify({'skus': []})
+    
+    store_data = data_processor.data[data_processor.data['store'] == store_id] if 'store' in data_processor.data.columns else data_processor.data
+    skus = store_data[['sku', 'desc', 'div', 'div_desc', 'dept', 'dept_desc']].drop_duplicates().to_dict('records') if 'sku' in store_data.columns else []
+    
+    return jsonify({'skus': skus})
+
+@app.route('/api/stores/<store_id>/dashboard')
+def get_store_dashboard(store_id):
+    """Get dashboard data for a specific store"""
+    if not PREDICTION_MODELS_AVAILABLE or data_processor is None:
+        return jsonify({'error': 'Data processor not available'}), 503
+    
+    if data_processor.data.empty:
+        return jsonify({'error': 'No data available'}), 400
+    
+    try:
+        store_data = data_processor.data[data_processor.data['store'] == store_id] if 'store' in data_processor.data.columns else data_processor.data
+        
+        if store_data.empty:
+            return jsonify({'error': f'No data found for store {store_id}'}), 404
+        
+        # Calculate dashboard metrics
+        today = datetime.now().date()
+        last_30_days = today - timedelta(days=30)
+        
+        recent_data = store_data[store_data['sales_date'].dt.date >= last_30_days] if 'sales_date' in store_data.columns else store_data
+        
+        dashboard = {
+            'store_id': store_id,
+            'total_skus': store_data['sku'].nunique() if 'sku' in store_data.columns else store_data['product_id'].nunique(),
+            'total_sales_30d': float(recent_data['act_sales'].sum()) if 'act_sales' in recent_data.columns and not recent_data['act_sales'].isna().all() else 0.0,
+            'total_qty_30d': float(recent_data['sold_qty'].sum()) if 'sold_qty' in recent_data.columns and not recent_data['sold_qty'].isna().all() else float(recent_data['demand_value'].sum()) if 'demand_value' in recent_data.columns else 0.0,
+            'avg_daily_sales': float(recent_data.groupby(recent_data['sales_date'].dt.date)['act_sales'].sum().mean()) if 'act_sales' in recent_data.columns and not recent_data['act_sales'].isna().all() else 0.0,
+            'promotion_days': int(recent_data['promotion'].sum()) if 'promotion' in recent_data.columns and not recent_data['promotion'].isna().all() else 0,
+            'top_selling_skus': store_data.groupby('sku')['sold_qty'].sum().nlargest(10).to_dict() if 'sku' in store_data.columns else {},
+            'departments': store_data['dept'].value_counts().to_dict() if 'dept' in store_data.columns else {},
+            'divisions': store_data['div'].value_counts().to_dict() if 'div' in store_data.columns else {}
+        }
+        
+        return jsonify(dashboard)
+        
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+        return jsonify({'error': f'Dashboard generation failed: {str(e)}'}), 500
+
+@app.route('/api/promotions', methods=['GET'])
+def get_promotions():
+    """Get promotion data"""
+    if not PREDICTION_MODELS_AVAILABLE or data_processor is None:
+        return jsonify({'error': 'Data processor not available'}), 503
+    
+    if data_processor.data.empty:
+        return jsonify({'promotions': []})
+    
+    # Get promotion data
+    promo_data = data_processor.data[data_processor.data['promotion'] == True] if 'promotion' in data_processor.data.columns else pd.DataFrame()
+    
+    if promo_data.empty:
+        return jsonify({'promotions': []})
+    
+    promotions = []
+    for _, row in promo_data.iterrows():
+        promotions.append({
+            'date': row['sales_date'].isoformat() if 'sales_date' in row else row['date'].isoformat(),
+            'store': row.get('store', ''),
+            'sku': row.get('sku', row.get('product_id', '')),
+            'desc': row.get('desc', ''),
+            'discount': row.get('promotion_discount', 0),
+            'sales_impact': row.get('act_sales', 0),
+            'qty_impact': row.get('sold_qty', row.get('demand_value', 0))
+        })
+    
+    return jsonify({'promotions': promotions})
+
+@app.route('/api/bulk/predict', methods=['POST'])
+def bulk_predict():
+    """Bulk prediction for multiple SKUs"""
+    if not PREDICTION_MODELS_AVAILABLE or predictor is None or data_processor is None:
+        return jsonify({'error': 'Prediction system not available'}), 503
+    
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No prediction request data'}), 400
+        
+        store_id = data.get('store_id')
+        skus = data.get('skus', [])
+        start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+        
+        if not store_id or not skus:
+            return jsonify({'error': 'store_id and skus are required'}), 400
+        
+        results = {}
+        
+        for sku in skus:
+            # Create prediction request for this SKU
+            pred_request = PredictionRequest(
+                product_id=sku,
+                start_date=start_date,
+                end_date=end_date,
+                include_confidence_interval=True,
+                additional_features={'store_id': store_id}
+            )
+            
+            # Filter data for this store and SKU
+            store_sku_data = data_processor.data[
+                (data_processor.data['store'] == store_id) & 
+                (data_processor.data['sku'] == sku)
+            ] if 'store' in data_processor.data.columns else data_processor.data[data_processor.data['product_id'] == sku]
+            
+            if not store_sku_data.empty:
+                predictions = predictor.predict(pred_request, store_sku_data)
+                
+                results[sku] = []
+                for pred in predictions:
+                    results[sku].append({
+                        'prediction_date': pred.prediction_date.isoformat(),
+                        'predicted_demand': pred.predicted_demand,
+                        'confidence_lower': pred.confidence_lower,
+                        'confidence_upper': pred.confidence_upper,
+                        'model_accuracy': pred.model_accuracy
+                    })
+        
+        return jsonify({
+            'success': True,
+            'store_id': store_id,
+            'predictions': results,
+            'summary': {
+                'total_skus': len(skus),
+                'predicted_skus': len([k for k, v in results.items() if v]),
+                'date_range': f"{start_date.date()} to {end_date.date()}"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Bulk prediction error: {e}")
+        return jsonify({'error': f'Bulk prediction failed: {str(e)}'}), 500
 def predict_demand():
     """Make demand predictions"""
     if not PREDICTION_MODELS_AVAILABLE or predictor is None or data_processor is None:
