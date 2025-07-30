@@ -3,109 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo11 Application</title>
+    <title>Demand Prediction System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
     <header class="header">
         <div class="container">
-            <h1><i class="fas fa-cloud"></i> Demo11 Application</h1>
-            <p>Azure-ready Web Application</p>
+            <h1><i class="fas fa-chart-line"></i> Demand Prediction System</h1>
+            <p>AI-powered demand forecasting and analytics platform</p>
         </div>
     </header>
 
     <main class="main">
         <div class="container">
+            <!-- System Status Panel -->
+            <div class="status-panel">
+                <h2><i class="fas fa-heartbeat"></i> System Status</h2>
+                <div id="system-status">Loading...</div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="showTab('data-management')">
+                    <i class="fas fa-database"></i> Data Management
+                </button>
+                <button class="tab-button" onclick="showTab('model-training')">
+                    <i class="fas fa-brain"></i> Model Training
+                </button>
+                <button class="tab-button" onclick="showTab('prediction')">
+                    <i class="fas fa-crystal-ball"></i> Prediction
+                </button>
+                <button class="tab-button" onclick="showTab('visualization')">
+                    <i class="fas fa-chart-bar"></i> Visualization
+                </button>
+            </div>
+
+            <!-- Data Management Tab -->
+            <div id="data-management" class="tab-content active">
+                <div class="card">
+                    <h3><i class="fas fa-upload"></i> Data Upload</h3>
+                    <div class="upload-section">
+                        <div class="upload-option">
+                            <h4>CSV File Upload</h4>
+                            <input type="file" id="csv-file" accept=".csv" />
+                            <button onclick="uploadCSV()">Upload CSV</button>
+                            <p class="help-text">Required columns: date, product_id, demand_value</p>
+                        </div>
+                        
+                        <div class="upload-option">
+                            <h4>Sample Data</h4>
+                            <button onclick="loadSampleData()">Load Sample Data</button>
+                            <p class="help-text">Load demonstration data for testing</p>
+                        </div>
+                    </div>
+                    
+                    <div id="upload-result"></div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-chart-pie"></i> Data Statistics</h3>
+                    <div id="data-statistics">
+                        <button onclick="loadDataStatistics()">Load Statistics</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Training Tab -->
+            <div id="model-training" class="tab-content">
+                <div class="card">
+                    <h3><i class="fas fa-cogs"></i> Train Prediction Model</h3>
+                    <div class="training-section">
+                        <button onclick="trainModel()">Train Model</button>
+                        <p class="help-text">Train machine learning models on uploaded data</p>
+                    </div>
+                    <div id="training-result"></div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-info-circle"></i> Model Information</h3>
+                    <div id="model-info">
+                        <button onclick="loadModelInfo()">Load Model Info</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prediction Tab -->
+            <div id="prediction" class="tab-content">
+                <div class="card">
+                    <h3><i class="fas fa-magic"></i> Make Predictions</h3>
+                    <div class="prediction-form">
+                        <div class="form-group">
+                            <label for="product-id">Product ID:</label>
+                            <input type="text" id="product-id" placeholder="e.g., PROD_001" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="start-date">Start Date:</label>
+                            <input type="date" id="start-date" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="end-date">End Date:</label>
+                            <input type="date" id="end-date" />
+                        </div>
+                        
+                        <button onclick="makePrediction()">Predict Demand</button>
+                    </div>
+                    <div id="prediction-result"></div>
+                </div>
+            </div>
+
+            <!-- Visualization Tab -->
+            <div id="visualization" class="tab-content">
+                <div class="card">
+                    <h3><i class="fas fa-chart-area"></i> Data Visualization</h3>
+                    <div class="visualization-controls">
+                        <button onclick="showChart('demand_over_time')">Demand Over Time</button>
+                        <button onclick="showChart('demand_distribution')">Demand Distribution</button>
+                        <button onclick="showChart('product_comparison')">Product Comparison</button>
+                        <button onclick="showChart('seasonal_pattern')">Seasonal Pattern</button>
+                    </div>
+                    <div id="chart-container"></div>
+                </div>
+            </div>
+
+            <!-- Features Grid -->
             <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fab fa-python"></i>
+                        <i class="fas fa-brain"></i>
                     </div>
-                    <h3>Python Backend</h3>
-                    <p>Flask-based REST API with Azure integration</p>
+                    <h3>AI-Powered Predictions</h3>
+                    <p>Advanced machine learning models for accurate demand forecasting</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fab fa-js-square"></i>
+                        <i class="fas fa-chart-line"></i>
                     </div>
-                    <h3>JavaScript Frontend</h3>
-                    <p>Modern HTML5 and JavaScript interface</p>
+                    <h3>Real-time Analytics</h3>
+                    <p>Interactive visualizations and statistical analysis</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fab fa-microsoft"></i>
+                        <i class="fas fa-cloud"></i>
                     </div>
-                    <h3>Azure Cloud</h3>
-                    <p>Ready for Azure deployment</p>
+                    <h3>Azure Integration</h3>
+                    <p>Scalable cloud deployment with Azure services</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-robot"></i>
+                        <i class="fas fa-cog"></i>
                     </div>
-                    <h3>Azure OpenAI</h3>
-                    <p>AI-powered chat functionality</p>
+                    <h3>Automated Training</h3>
+                    <p>Self-improving models with automated retraining</p>
                 </div>
-            </div>
-
-            <div class="demo-section">
-                <h2>System Status</h2>
-                <div class="status-panel">
-                    <div id="status-info">
-                        <i class="fas fa-spinner fa-spin"></i> Loading system status...
-                    </div>
-                </div>
-            </div>
-
-            <div class="demo-section">
-                <h2>AI Chat Demo</h2>
-                <div class="chat-panel">
-                    <div id="chat-messages" class="chat-messages"></div>
-                    <div class="chat-input">
-                        <input type="text" id="message-input" placeholder="メッセージを入力してください..." disabled>
-                        <button id="send-button" disabled>
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                    <div id="chat-status" class="chat-status">
-                        Checking Azure OpenAI availability...
-                    </div>
-                </div>
-            </div>
-
-            <div class="demo-section">
-                <h2>API Endpoints</h2>
-                <div class="api-panel">
-                    <div class="api-endpoint">
-                        <span class="method">GET</span>
-                        <span class="path">/api/health</span>
-                        <span class="description">System health check</span>
-                        <button class="test-btn" onclick="testEndpoint('/api/health')">Test</button>
-                    </div>
-                    <div class="api-endpoint">
-                        <span class="method">GET</span>
-                        <span class="path">/api/info</span>
-                        <span class="description">Application information</span>
-                        <button class="test-btn" onclick="testEndpoint('/api/info')">Test</button>
-                    </div>
-                    <div class="api-endpoint">
-                        <span class="method">POST</span>
-                        <span class="path">/api/chat</span>
-                        <span class="description">Azure OpenAI chat</span>
-                        <button class="test-btn" onclick="testChatEndpoint()">Test</button>
-                    </div>
-                </div>
-                <div id="api-response" class="api-response"></div>
             </div>
         </div>
     </main>
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2025 Demo11 Application. Built with Python Flask and Azure.</p>
+            <p>&copy; 2024 Demand Prediction System. AI-powered forecasting platform.</p>
         </div>
     </footer>
 
