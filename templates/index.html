@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demand Prediction System</title>
+    <title>店舗需要予測システム - Store Demand Forecasting</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -11,156 +11,229 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1><i class="fas fa-chart-line"></i> Demand Prediction System</h1>
-            <p>AI-powered demand forecasting and analytics platform</p>
+            <h1><i class="fas fa-store"></i> 店舗需要予測システム</h1>
+            <p>Store Demand Forecasting System - AI-powered retail analytics</p>
+            
+            <!-- Role Selection -->
+            <div class="role-selector">
+                <button class="role-btn active" onclick="setRole('store_manager')">
+                    <i class="fas fa-user-tie"></i> 店長モード
+                </button>
+                <button class="role-btn" onclick="setRole('data_analyst')">
+                    <i class="fas fa-chart-line"></i> データアナリスト
+                </button>
+            </div>
         </div>
     </header>
 
     <main class="main">
         <div class="container">
-            <!-- System Status Panel -->
-            <div class="status-panel">
-                <h2><i class="fas fa-heartbeat"></i> System Status</h2>
-                <div id="system-status">Loading...</div>
+            <!-- Store Manager Interface -->
+            <div id="store-manager-interface" class="role-interface active">
+                <!-- Store Selection Panel -->
+                <div class="store-selection-panel">
+                    <h2><i class="fas fa-store"></i> 店舗選択</h2>
+                    <select id="store-selector" onchange="loadStoreData()">
+                        <option value="">店舗を選択してください</option>
+                    </select>
+                    <button onclick="loadStores()" class="refresh-btn">
+                        <i class="fas fa-sync"></i> 更新
+                    </button>
+                </div>
+
+                <!-- Store Dashboard -->
+                <div id="store-dashboard" class="dashboard-grid">
+                    <!-- Dashboard content will be loaded here -->
+                </div>
+
+                <!-- Navigation Tabs for Store Manager -->
+                <div class="tabs">
+                    <button class="tab-button active" onclick="showTab('quick-forecast')">
+                        <i class="fas fa-bolt"></i> 簡単予測
+                    </button>
+                    <button class="tab-button" onclick="showTab('promotion-manager')">
+                        <i class="fas fa-tags"></i> プロモーション管理
+                    </button>
+                    <button class="tab-button" onclick="showTab('bulk-operations')">
+                        <i class="fas fa-list"></i> 一括操作
+                    </button>
+                    <button class="tab-button" onclick="showTab('store-analytics')">
+                        <i class="fas fa-chart-pie"></i> 店舗分析
+                    </button>
+                </div>
+
+                <!-- Quick Forecast Tab -->
+                <div id="quick-forecast" class="tab-content active">
+                    <div class="card">
+                        <h3><i class="fas fa-magic"></i> 簡単需要予測</h3>
+                        <div class="quick-forecast-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="forecast-period">予測期間:</label>
+                                    <select id="forecast-period">
+                                        <option value="7">1週間</option>
+                                        <option value="14">2週間</option>
+                                        <option value="30">1ヶ月</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="department-filter">部門:</label>
+                                    <select id="department-filter">
+                                        <option value="">全部門</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button onclick="generateQuickForecast()" class="primary-btn">
+                                <i class="fas fa-crystal-ball"></i> 予測実行
+                            </button>
+                        </div>
+                        <div id="quick-forecast-results"></div>
+                    </div>
+                </div>
+
+                <!-- Promotion Manager Tab -->
+                <div id="promotion-manager" class="tab-content">
+                    <div class="card">
+                        <h3><i class="fas fa-tags"></i> プロモーション管理</h3>
+                        <div class="promotion-controls">
+                            <button onclick="showPromotionCalendar()" class="action-btn">
+                                <i class="fas fa-calendar"></i> プロモーションカレンダー
+                            </button>
+                            <button onclick="analyzePromotionImpact()" class="action-btn">
+                                <i class="fas fa-chart-line"></i> 効果分析
+                            </button>
+                            <button onclick="planNewPromotion()" class="action-btn">
+                                <i class="fas fa-plus"></i> 新規プロモーション
+                            </button>
+                        </div>
+                        <div id="promotion-content"></div>
+                    </div>
+                </div>
+
+                <!-- Bulk Operations Tab -->
+                <div id="bulk-operations" class="tab-content">
+                    <div class="card">
+                        <h3><i class="fas fa-list"></i> 一括操作</h3>
+                        <div class="bulk-controls">
+                            <div class="form-group">
+                                <label for="sku-selection-mode">SKU選択方法:</label>
+                                <select id="sku-selection-mode" onchange="updateSkuSelection()">
+                                    <option value="department">部門別</option>
+                                    <option value="division">事業部別</option>
+                                    <option value="top-selling">売上上位</option>
+                                    <option value="custom">カスタム選択</option>
+                                </select>
+                            </div>
+                            <div id="sku-selection-panel"></div>
+                            <button onclick="executeBulkForecast()" class="primary-btn">
+                                <i class="fas fa-play"></i> 一括予測実行
+                            </button>
+                        </div>
+                        <div id="bulk-results"></div>
+                    </div>
+                </div>
+
+                <!-- Store Analytics Tab -->
+                <div id="store-analytics" class="tab-content">
+                    <div class="card">
+                        <h3><i class="fas fa-chart-pie"></i> 店舗分析</h3>
+                        <div class="analytics-controls">
+                            <button onclick="showSalesAnalytics()">売上分析</button>
+                            <button onclick="showInventoryAnalytics()">在庫分析</button>
+                            <button onclick="showSeasonalAnalytics()">季節性分析</button>
+                        </div>
+                        <div id="analytics-content"></div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Navigation Tabs -->
-            <div class="tabs">
-                <button class="tab-button active" onclick="showTab('data-management')">
-                    <i class="fas fa-database"></i> Data Management
-                </button>
-                <button class="tab-button" onclick="showTab('model-training')">
-                    <i class="fas fa-brain"></i> Model Training
-                </button>
-                <button class="tab-button" onclick="showTab('prediction')">
-                    <i class="fas fa-crystal-ball"></i> Prediction
-                </button>
-                <button class="tab-button" onclick="showTab('visualization')">
-                    <i class="fas fa-chart-bar"></i> Visualization
-                </button>
-            </div>
+            <!-- Data Analyst Interface -->
+            <div id="data-analyst-interface" class="role-interface">
+                <!-- Navigation Tabs for Data Analyst -->
+                <div class="tabs">
+                    <button class="tab-button active" onclick="showTab('data-management')">
+                        <i class="fas fa-database"></i> データ管理
+                    </button>
+                    <button class="tab-button" onclick="showTab('model-training')">
+                        <i class="fas fa-brain"></i> モデル訓練
+                    </button>
+                    <button class="tab-button" onclick="showTab('advanced-analytics')">
+                        <i class="fas fa-chart-bar"></i> 高度な分析
+                    </button>
+                    <button class="tab-button" onclick="showTab('system-status')">
+                        <i class="fas fa-cog"></i> システム状態
+                    </button>
+                </div>
 
-            <!-- Data Management Tab -->
-            <div id="data-management" class="tab-content active">
-                <div class="card">
-                    <h3><i class="fas fa-upload"></i> Data Upload</h3>
-                    <div class="upload-section">
-                        <div class="upload-option">
-                            <h4>CSV File Upload</h4>
-                            <input type="file" id="csv-file" accept=".csv" />
-                            <button onclick="uploadCSV()">Upload CSV</button>
-                            <p class="help-text">Required columns: date, product_id, demand_value</p>
+                <!-- Data Management Tab -->
+                <div id="data-management" class="tab-content active">
+                    <div class="card">
+                        <h3><i class="fas fa-upload"></i> データアップロード</h3>
+                        <div class="upload-section">
+                            <div class="upload-option">
+                                <h4>小売データ形式 (推奨)</h4>
+                                <input type="file" id="csv-file" accept=".csv" />
+                                <button onclick="uploadCSV()">CSVアップロード</button>
+                                <p class="help-text">必須列: SALES DATE, STORE, SKU, SOLD QTY, ACT SALES</p>
+                            </div>
+                            
+                            <div class="upload-option">
+                                <h4>サンプルデータ</h4>
+                                <button onclick="loadRetailSampleData()">小売サンプルデータ</button>
+                                <p class="help-text">デモ用のサンプルデータを読み込み</p>
+                            </div>
                         </div>
                         
-                        <div class="upload-option">
-                            <h4>Sample Data</h4>
-                            <button onclick="loadSampleData()">Load Sample Data</button>
-                            <p class="help-text">Load demonstration data for testing</p>
+                        <div id="upload-result"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3><i class="fas fa-chart-pie"></i> データ統計</h3>
+                        <div id="data-statistics">
+                            <button onclick="loadDataStatistics()">統計読み込み</button>
                         </div>
                     </div>
-                    
-                    <div id="upload-result"></div>
                 </div>
 
-                <div class="card">
-                    <h3><i class="fas fa-chart-pie"></i> Data Statistics</h3>
-                    <div id="data-statistics">
-                        <button onclick="loadDataStatistics()">Load Statistics</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Model Training Tab -->
-            <div id="model-training" class="tab-content">
-                <div class="card">
-                    <h3><i class="fas fa-cogs"></i> Train Prediction Model</h3>
-                    <div class="training-section">
-                        <button onclick="trainModel()">Train Model</button>
-                        <p class="help-text">Train machine learning models on uploaded data</p>
-                    </div>
-                    <div id="training-result"></div>
-                </div>
-
-                <div class="card">
-                    <h3><i class="fas fa-info-circle"></i> Model Information</h3>
-                    <div id="model-info">
-                        <button onclick="loadModelInfo()">Load Model Info</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Prediction Tab -->
-            <div id="prediction" class="tab-content">
-                <div class="card">
-                    <h3><i class="fas fa-magic"></i> Make Predictions</h3>
-                    <div class="prediction-form">
-                        <div class="form-group">
-                            <label for="product-id">Product ID:</label>
-                            <input type="text" id="product-id" placeholder="e.g., PROD_001" />
+                <!-- Model Training Tab -->
+                <div id="model-training" class="tab-content">
+                    <div class="card">
+                        <h3><i class="fas fa-cogs"></i> モデル訓練</h3>
+                        <div class="training-section">
+                            <button onclick="trainModel()">モデル訓練実行</button>
+                            <p class="help-text">アップロードされたデータで機械学習モデルを訓練</p>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="start-date">Start Date:</label>
-                            <input type="date" id="start-date" />
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="end-date">End Date:</label>
-                            <input type="date" id="end-date" />
-                        </div>
-                        
-                        <button onclick="makePrediction()">Predict Demand</button>
+                        <div id="training-result"></div>
                     </div>
-                    <div id="prediction-result"></div>
-                </div>
-            </div>
 
-            <!-- Visualization Tab -->
-            <div id="visualization" class="tab-content">
-                <div class="card">
-                    <h3><i class="fas fa-chart-area"></i> Data Visualization</h3>
-                    <div class="visualization-controls">
-                        <button onclick="showChart('demand_over_time')">Demand Over Time</button>
-                        <button onclick="showChart('demand_distribution')">Demand Distribution</button>
-                        <button onclick="showChart('product_comparison')">Product Comparison</button>
-                        <button onclick="showChart('seasonal_pattern')">Seasonal Pattern</button>
+                    <div class="card">
+                        <h3><i class="fas fa-info-circle"></i> モデル情報</h3>
+                        <div id="model-info">
+                            <button onclick="loadModelInfo()">モデル情報読み込み</button>
+                        </div>
                     </div>
-                    <div id="chart-container"></div>
                 </div>
-            </div>
 
-            <!-- Features Grid -->
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-brain"></i>
+                <!-- Advanced Analytics Tab -->
+                <div id="advanced-analytics" class="tab-content">
+                    <div class="card">
+                        <h3><i class="fas fa-chart-area"></i> 高度な可視化</h3>
+                        <div class="visualization-controls">
+                            <button onclick="showChart('demand_over_time')">時系列需要</button>
+                            <button onclick="showChart('demand_distribution')">需要分布</button>
+                            <button onclick="showChart('product_comparison')">商品比較</button>
+                            <button onclick="showChart('seasonal_pattern')">季節性パターン</button>
+                        </div>
+                        <div id="chart-container"></div>
                     </div>
-                    <h3>AI-Powered Predictions</h3>
-                    <p>Advanced machine learning models for accurate demand forecasting</p>
                 </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-chart-line"></i>
+
+                <!-- System Status Tab -->
+                <div id="system-status" class="tab-content">
+                    <div class="status-panel">
+                        <h2><i class="fas fa-heartbeat"></i> システム状態</h2>
+                        <div id="system-status-info">Loading...</div>
                     </div>
-                    <h3>Real-time Analytics</h3>
-                    <p>Interactive visualizations and statistical analysis</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-cloud"></i>
-                    </div>
-                    <h3>Azure Integration</h3>
-                    <p>Scalable cloud deployment with Azure services</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-cog"></i>
-                    </div>
-                    <h3>Automated Training</h3>
-                    <p>Self-improving models with automated retraining</p>
                 </div>
             </div>
         </div>
@@ -168,7 +241,7 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Demand Prediction System. AI-powered forecasting platform.</p>
+            <p>&copy; 2024 Store Demand Forecasting System. AI-powered retail analytics platform.</p>
         </div>
     </footer>
 

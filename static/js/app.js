@@ -1,13 +1,15 @@
-// Demand Prediction System JavaScript
+// Store Demand Prediction System JavaScript
 
-class DemandPredictionApp {
+class StoreDemandPredictionApp {
     constructor() {
-        this.currentTab = 'data-management';
+        this.currentTab = 'quick-forecast';
+        this.currentRole = 'store_manager';
+        this.selectedStore = null;
         this.init();
     }
 
     async init() {
-        console.log('Demand Prediction System starting...');
+        console.log('Store Demand Prediction System starting...');
         
         // Initialize components
         this.initEventListeners();
@@ -15,6 +17,9 @@ class DemandPredictionApp {
         
         // Set default dates
         this.setDefaultDates();
+        
+        // Load initial data
+        this.loadStores();
     }
 
     initEventListeners() {
@@ -42,7 +47,7 @@ class DemandPredictionApp {
             const response = await fetch('/api/health');
             const data = await response.json();
             
-            const statusElement = document.getElementById('system-status');
+            const statusElement = document.getElementById('system-status-info') || document.getElementById('system-status');
             if (statusElement) {
                 statusElement.innerHTML = `
                     <div class="status-item">
@@ -69,7 +74,7 @@ class DemandPredictionApp {
             }
         } catch (error) {
             console.error('Failed to load system status:', error);
-            const statusElement = document.getElementById('system-status');
+            const statusElement = document.getElementById('system-status-info') || document.getElementById('system-status');
             if (statusElement) {
                 statusElement.innerHTML = `
                     <i class="fas fa-exclamation-triangle" style="color: #dc3545;"></i> 
@@ -129,6 +134,768 @@ class DemandPredictionApp {
                 }
             }, 300);
         }, 3000);
+    }
+
+    async loadStores() {
+        try {
+            const response = await fetch('/api/stores');
+            const data = await response.json();
+            
+            const storeSelector = document.getElementById('store-selector');
+            if (storeSelector && data.stores) {
+                storeSelector.innerHTML = '<option value="">店舗を選択してください</option>';
+                data.stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    storeSelector.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load stores:', error);
+            this.showNotification('Failed to load stores', 'error');
+        }
+    }
+
+    async loadStoreData() {
+        const storeSelector = document.getElementById('store-selector');
+        const storeId = storeSelector.value;
+        
+        if (!storeId) {
+            document.getElementById('store-dashboard').innerHTML = '';
+            return;
+        }
+        
+        this.selectedStore = storeId;
+        
+        try {
+            // Load store dashboard data
+            const response = await fetch(`/api/stores/${storeId}/dashboard`);
+            const data = await response.json();
+            
+            this.displayStoreDashboard(data);
+            this.loadStoreSKUs(storeId);
+            this.loadDepartments(storeId);
+            
+        } catch (error) {
+            console.error('Failed to load store data:', error);
+            this.showNotification('Failed to load store data', 'error');
+        }
+    }
+
+    displayStoreDashboard(data) {
+        const dashboard = document.getElementById('store-dashboard');
+        dashboard.innerHTML = `
+            <div class="dashboard-card">
+                <h3><i class="fas fa-boxes"></i> 取扱SKU数</h3>
+                <div class="dashboard-value">${data.total_skus || 0}</div>
+                <div class="dashboard-label">SKUs</div>
+            </div>
+            <div class="dashboard-card">
+                <h3><i class="fas fa-yen-sign"></i> 月間売上</h3>
+                <div class="dashboard-value">¥${(data.total_sales_30d || 0).toLocaleString()}</div>
+                <div class="dashboard-label">過去30日間</div>
+            </div>
+            <div class="dashboard-card">
+                <h3><i class="fas fa-shopping-cart"></i> 販売数量</h3>
+                <div class="dashboard-value">${(data.total_qty_30d || 0).toLocaleString()}</div>
+                <div class="dashboard-label">過去30日間</div>
+            </div>
+            <div class="dashboard-card">
+                <h3><i class="fas fa-calendar-day"></i> 日平均売上</h3>
+                <div class="dashboard-value">¥${(data.avg_daily_sales || 0).toLocaleString()}</div>
+                <div class="dashboard-label">1日あたり</div>
+            </div>
+            <div class="dashboard-card">
+                <h3><i class="fas fa-tags"></i> プロモーション</h3>
+                <div class="dashboard-value">${data.promotion_days || 0}</div>
+                <div class="dashboard-label">実施日数(30日間)</div>
+            </div>
+        `;
+    }
+
+    async loadStoreSKUs(storeId) {
+        try {
+            const response = await fetch(`/api/stores/${storeId}/skus`);
+            const data = await response.json();
+            
+            // Store SKUs for later use
+            this.storeSKUs = data.skus || [];
+            
+        } catch (error) {
+            console.error('Failed to load store SKUs:', error);
+        }
+    }
+
+    async loadDepartments(storeId) {
+        try {
+            const response = await fetch(`/api/stores/${storeId}/skus`);
+            const data = await response.json();
+            
+            const departments = [...new Set(data.skus.map(sku => sku.dept).filter(dept => dept))];
+            
+            const deptSelector = document.getElementById('department-filter');
+            if (deptSelector) {
+                deptSelector.innerHTML = '<option value="">全部門</option>';
+                departments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    deptSelector.appendChild(option);
+                });
+            }
+            
+        } catch (error) {
+            console.error('Failed to load departments:', error);
+        }
+    }
+}
+
+// Role Management Functions
+function setRole(role) {
+    // Update role buttons
+    document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Show/hide interfaces
+    document.querySelectorAll('.role-interface').forEach(interface => {
+        interface.classList.remove('active');
+    });
+    
+    if (role === 'store_manager') {
+        document.getElementById('store-manager-interface').classList.add('active');
+        app.currentRole = 'store_manager';
+    } else {
+        document.getElementById('data-analyst-interface').classList.add('active');
+        app.currentRole = 'data_analyst';
+    }
+}
+
+// Store Manager Functions
+function loadStoreData() {
+    app.loadStoreData();
+}
+
+function loadStores() {
+    app.loadStores();
+}
+
+async function generateQuickForecast() {
+    if (!app.selectedStore) {
+        app.showNotification('店舗を選択してください', 'error');
+        return;
+    }
+    
+    const period = document.getElementById('forecast-period').value;
+    const department = document.getElementById('department-filter').value;
+    
+    document.getElementById('quick-forecast-results').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> 予測を実行中...
+        </div>
+    `;
+    
+    try {
+        // Get SKUs for the department
+        let skusToForecast = app.storeSKUs || [];
+        if (department) {
+            skusToForecast = skusToForecast.filter(sku => sku.dept === department);
+        }
+        
+        // Limit to top 20 SKUs for quick forecast
+        const topSKUs = skusToForecast.slice(0, 20).map(sku => sku.sku);
+        
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(startDate.getDate() + parseInt(period));
+        
+        const response = await fetch('/api/bulk/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                store_id: app.selectedStore,
+                skus: topSKUs,
+                start_date: startDate.toISOString(),
+                end_date: endDate.toISOString()
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            displayQuickForecastResults(data);
+            app.showNotification('予測が完了しました', 'success');
+        } else {
+            app.showNotification(data.error || '予測に失敗しました', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Quick forecast error:', error);
+        app.showNotification('予測に失敗しました', 'error');
+    }
+}
+
+function displayQuickForecastResults(data) {
+    let html = `
+        <div class="forecast-summary">
+            <h4>予測結果サマリー</h4>
+            <p>対象店舗: ${data.store_id}</p>
+            <p>予測SKU数: ${data.summary.predicted_skus} / ${data.summary.total_skus}</p>
+            <p>予測期間: ${data.summary.date_range}</p>
+        </div>
+        <table class="bulk-results-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>予測需要(合計)</th>
+                    <th>信頼度</th>
+                    <th>アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    Object.entries(data.predictions).forEach(([sku, predictions]) => {
+        if (predictions.length > 0) {
+            const totalDemand = predictions.reduce((sum, p) => sum + p.predicted_demand, 0);
+            const avgAccuracy = predictions.reduce((sum, p) => sum + (p.model_accuracy || 0), 0) / predictions.length;
+            const confidenceClass = avgAccuracy > 0.8 ? 'confidence-high' : avgAccuracy > 0.6 ? 'confidence-medium' : 'confidence-low';
+            
+            html += `
+                <tr>
+                    <td>${sku}</td>
+                    <td>${totalDemand.toFixed(0)}</td>
+                    <td><span class="confidence-indicator ${confidenceClass}">${(avgAccuracy * 100).toFixed(0)}%</span></td>
+                    <td><button onclick="adjustPrediction('${sku}')">調整</button></td>
+                </tr>
+            `;
+        }
+    });
+    
+    html += '</tbody></table>';
+    document.getElementById('quick-forecast-results').innerHTML = html;
+}
+
+function updateSkuSelection() {
+    const mode = document.getElementById('sku-selection-mode').value;
+    const panel = document.getElementById('sku-selection-panel');
+    
+    if (!app.storeSKUs || app.storeSKUs.length === 0) {
+        panel.innerHTML = '<p>SKUデータがありません。店舗を選択してください。</p>';
+        return;
+    }
+    
+    let skusToShow = [];
+    
+    switch (mode) {
+        case 'department':
+            // Group by department
+            const depts = [...new Set(app.storeSKUs.map(sku => sku.dept).filter(dept => dept))];
+            panel.innerHTML = `
+                <label for="dept-select">部門を選択:</label>
+                <select id="dept-select" onchange="filterSKUsByDepartment()">
+                    <option value="">部門を選択</option>
+                    ${depts.map(dept => `<option value="${dept}">${dept}</option>`).join('')}
+                </select>
+                <div id="dept-skus"></div>
+            `;
+            break;
+            
+        case 'top-selling':
+            // Show top 50 SKUs (mock for demo)
+            skusToShow = app.storeSKUs.slice(0, 50);
+            displaySKUSelection(skusToShow, panel);
+            break;
+            
+        case 'custom':
+            displaySKUSelection(app.storeSKUs, panel);
+            break;
+            
+        default:
+            panel.innerHTML = '';
+    }
+}
+
+function displaySKUSelection(skus, container) {
+    let html = '<div class="sku-selection-list">';
+    
+    skus.forEach(sku => {
+        html += `
+            <div class="sku-item">
+                <input type="checkbox" class="sku-checkbox" value="${sku.sku}" id="sku-${sku.sku}">
+                <label for="sku-${sku.sku}" class="sku-info">
+                    <div class="sku-code">${sku.sku}</div>
+                    <div class="sku-desc">${sku.desc}</div>
+                </label>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function executeBulkForecast() {
+    const selectedSKUs = Array.from(document.querySelectorAll('.sku-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedSKUs.length === 0) {
+        app.showNotification('SKUを選択してください', 'error');
+        return;
+    }
+    
+    if (!app.selectedStore) {
+        app.showNotification('店舗を選択してください', 'error');
+        return;
+    }
+    
+    document.getElementById('bulk-results').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> ${selectedSKUs.length}個のSKUを予測中...
+        </div>
+    `;
+    
+    try {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(startDate.getDate() + 14); // 2 weeks
+        
+        const response = await fetch('/api/bulk/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                store_id: app.selectedStore,
+                skus: selectedSKUs,
+                start_date: startDate.toISOString(),
+                end_date: endDate.toISOString()
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            displayBulkResults(data);
+            app.showNotification('一括予測が完了しました', 'success');
+        } else {
+            app.showNotification(data.error || '一括予測に失敗しました', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Bulk forecast error:', error);
+        app.showNotification('一括予測に失敗しました', 'error');
+    }
+}
+
+function displayBulkResults(data) {
+    let html = `
+        <div class="bulk-summary">
+            <h4>一括予測結果</h4>
+            <p>対象店舗: ${data.store_id}</p>
+            <p>予測SKU数: ${data.summary.predicted_skus} / ${data.summary.total_skus}</p>
+            <p>予測期間: ${data.summary.date_range}</p>
+            <button onclick="exportBulkResults()" class="action-btn">
+                <i class="fas fa-download"></i> エクスポート
+            </button>
+        </div>
+        <table class="bulk-results-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>合計予測需要</th>
+                    <th>日平均</th>
+                    <th>信頼度</th>
+                    <th>推奨アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    Object.entries(data.predictions).forEach(([sku, predictions]) => {
+        if (predictions.length > 0) {
+            const totalDemand = predictions.reduce((sum, p) => sum + p.predicted_demand, 0);
+            const avgDemand = totalDemand / predictions.length;
+            const avgAccuracy = predictions.reduce((sum, p) => sum + (p.model_accuracy || 0), 0) / predictions.length;
+            const confidenceClass = avgAccuracy > 0.8 ? 'confidence-high' : avgAccuracy > 0.6 ? 'confidence-medium' : 'confidence-low';
+            
+            let recommendation = '通常発注';
+            if (avgDemand > 100) recommendation = '在庫増加検討';
+            if (avgAccuracy < 0.6) recommendation = '要注意';
+            
+            html += `
+                <tr>
+                    <td>${sku}</td>
+                    <td>${totalDemand.toFixed(0)}</td>
+                    <td>${avgDemand.toFixed(1)}</td>
+                    <td><span class="confidence-indicator ${confidenceClass}">${(avgAccuracy * 100).toFixed(0)}%</span></td>
+                    <td>${recommendation}</td>
+                </tr>
+            `;
+        }
+    });
+    
+    html += '</tbody></table>';
+    document.getElementById('bulk-results').innerHTML = html;
+}
+
+// Additional utility functions
+function filterSKUsByDepartment() {
+    const selectedDept = document.getElementById('dept-select').value;
+    if (!selectedDept || !app.storeSKUs) return;
+    
+    const filteredSKUs = app.storeSKUs.filter(sku => sku.dept === selectedDept);
+    const container = document.getElementById('dept-skus');
+    displaySKUSelection(filteredSKUs, container);
+}
+
+function adjustPrediction(sku) {
+    app.showNotification(`予測調整機能 - SKU: ${sku}`, 'info');
+    // TODO: Implement prediction adjustment interface
+}
+
+function exportBulkResults() {
+    app.showNotification('エクスポート機能を実装中...', 'info');
+    // TODO: Implement CSV export functionality
+}
+
+function showPromotionCalendar() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-calendar">
+            <h4>プロモーションカレンダー</h4>
+            <p>プロモーションカレンダー機能を実装中...</p>
+        </div>
+    `;
+}
+
+function analyzePromotionImpact() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-analysis">
+            <h4>プロモーション効果分析</h4>
+            <p>プロモーション効果分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function planNewPromotion() {
+    document.getElementById('promotion-content').innerHTML = `
+        <div class="promotion-planning">
+            <h4>新規プロモーション計画</h4>
+            <p>新規プロモーション計画機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showSalesAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="sales-analytics">
+            <h4>売上分析</h4>
+            <p>売上分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showInventoryAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="inventory-analytics">
+            <h4>在庫分析</h4>
+            <p>在庫分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+function showSeasonalAnalytics() {
+    document.getElementById('analytics-content').innerHTML = `
+        <div class="seasonal-analytics">
+            <h4>季節性分析</h4>
+            <p>季節性分析機能を実装中...</p>
+        </div>
+    `;
+}
+
+// Legacy Functions for Data Analyst Interface
+function showTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+
+    // Show selected tab content
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+
+    // Add active class to clicked button
+    const clickedButton = event.target.closest('.tab-button');
+    if (clickedButton) {
+        clickedButton.classList.add('active');
+    }
+}
+
+// Data Management Functions
+async function uploadCSV() {
+    const fileInput = document.getElementById('csv-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        app.showNotification('CSVファイルを選択してください', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/data/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            app.showNotification('データアップロード成功！', 'success');
+            document.getElementById('upload-result').innerHTML = `
+                <div class="success-message">
+                    <h4>アップロード成功!</h4>
+                    <p>${data.message}</p>
+                    <div class="enhanced-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-store"></i></div>
+                            <div class="stat-number">${data.statistics.unique_stores || 0}</div>
+                            <div class="stat-description">店舗数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                            <div class="stat-number">${data.statistics.unique_skus || 0}</div>
+                            <div class="stat-description">SKU数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-yen-sign"></i></div>
+                            <div class="stat-number">¥${(data.statistics.sales_stats?.total_sales || 0).toLocaleString()}</div>
+                            <div class="stat-description">総売上</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-tags"></i></div>
+                            <div class="stat-number">${data.statistics.promotion_stats?.total_promotion_days || 0}</div>
+                            <div class="stat-description">プロモーション日数</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Load stores after successful upload
+            app.loadStores();
+        } else {
+            app.showNotification(data.error || 'アップロード失敗', 'error');
+            document.getElementById('upload-result').innerHTML = `
+                <div class="error-message">エラー: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        app.showNotification('アップロード失敗', 'error');
+        document.getElementById('upload-result').innerHTML = `
+            <div class="error-message">アップロード失敗: ${error.message}</div>
+        `;
+    }
+}
+
+async function loadDataStatistics() {
+    try {
+        const response = await fetch('/api/data/statistics');
+        const data = await response.json();
+        
+        if (response.ok && data.total_records) {
+            document.getElementById('data-statistics').innerHTML = `
+                <div class="enhanced-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-database"></i></div>
+                        <div class="stat-number">${data.total_records}</div>
+                        <div class="stat-description">総レコード数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-store"></i></div>
+                        <div class="stat-number">${data.unique_stores || 0}</div>
+                        <div class="stat-description">店舗数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                        <div class="stat-number">${data.unique_skus || data.unique_products}</div>
+                        <div class="stat-description">SKU数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-building"></i></div>
+                        <div class="stat-number">${data.unique_divisions || 0}</div>
+                        <div class="stat-description">事業部数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="stat-number">${data.unique_departments || 0}</div>
+                        <div class="stat-description">部門数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-yen-sign"></i></div>
+                        <div class="stat-number">¥${(data.sales_stats?.total_sales || 0).toLocaleString()}</div>
+                        <div class="stat-description">総売上</div>
+                    </div>
+                </div>
+                <div class="stat-details">
+                    <h4>期間</h4>
+                    <p>${data.date_range?.start} ～ ${data.date_range?.end}</p>
+                    <h4>需要統計</h4>
+                    <p>平均: ${data.demand_stats?.mean?.toFixed(2)}, 最小: ${data.demand_stats?.min}, 最大: ${data.demand_stats?.max}</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('data-statistics').innerHTML = `
+                <div class="info-message">データがありません。まずデータをアップロードしてください。</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Statistics error:', error);
+        document.getElementById('data-statistics').innerHTML = `
+            <div class="error-message">統計読み込み失敗: ${error.message}</div>
+        `;
+    }
+}
+
+// Model Training Functions
+async function trainModel() {
+    document.getElementById('training-result').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> モデル訓練中... しばらくお待ちください。
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/model/train', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            app.showNotification('モデル訓練成功！', 'success');
+            document.getElementById('training-result').innerHTML = `
+                <div class="success-message">
+                    <h4>訓練成功!</h4>
+                    <div class="training-metrics">
+                        <p><strong>アクティブモデル:</strong> ${data.active_model}</p>
+                        <p><strong>訓練サンプル:</strong> ${data.training_samples}</p>
+                        <p><strong>テストサンプル:</strong> ${data.test_samples}</p>
+                        <pre>${JSON.stringify(data.metrics, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+            
+            // Refresh system status
+            app.loadSystemStatus();
+        } else {
+            app.showNotification(data.error || '訓練失敗', 'error');
+            document.getElementById('training-result').innerHTML = `
+                <div class="error-message">訓練失敗: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Training error:', error);
+        app.showNotification('訓練失敗', 'error');
+        document.getElementById('training-result').innerHTML = `
+            <div class="error-message">訓練失敗: ${error.message}</div>
+        `;
+    }
+}
+
+async function loadModelInfo() {
+    try {
+        const response = await fetch('/api/info');
+        const data = await response.json();
+        
+        if (response.ok) {
+            const modelInfo = data.model_info;
+            document.getElementById('model-info').innerHTML = `
+                <div class="model-info-display">
+                    <h4>モデル情報</h4>
+                    <div class="enhanced-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-number">${modelInfo.is_trained ? '訓練済み' : '未訓練'}</div>
+                            <div class="stat-description">ステータス</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-brain"></i></div>
+                            <div class="stat-number">${modelInfo.active_model || 'なし'}</div>
+                            <div class="stat-description">アクティブモデル</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-list"></i></div>
+                            <div class="stat-number">${modelInfo.available_models ? modelInfo.available_models.length : 0}</div>
+                            <div class="stat-description">利用可能モデル数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-columns"></i></div>
+                            <div class="stat-number">${modelInfo.feature_columns ? modelInfo.feature_columns.length : 0}</div>
+                            <div class="stat-description">特徴量数</div>
+                        </div>
+                    </div>
+                    ${modelInfo.metrics ? `<pre>${JSON.stringify(modelInfo.metrics, null, 2)}</pre>` : ''}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Model info error:', error);
+        document.getElementById('model-info').innerHTML = `
+            <div class="error-message">モデル情報読み込み失敗: ${error.message}</div>
+        `;
+    }
+}
+
+// Visualization Functions
+async function showChart(chartType) {
+    document.getElementById('chart-container').innerHTML = `
+        <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i> ${chartType.replace('_', ' ')} チャート生成中...
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/api/visualize/${chartType}`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            app.showNotification('チャート生成成功！', 'success');
+            
+            // Create a new div for the plot
+            const plotDiv = document.createElement('div');
+            plotDiv.id = 'plotly-chart';
+            plotDiv.style.width = '100%';
+            plotDiv.style.height = '500px';
+            
+            document.getElementById('chart-container').innerHTML = '';
+            document.getElementById('chart-container').appendChild(plotDiv);
+            
+            // Render the Plotly chart
+            Plotly.newPlot('plotly-chart', data.chart.data, data.chart.layout, {responsive: true});
+        } else {
+            app.showNotification(data.error || 'チャート生成失敗', 'error');
+            document.getElementById('chart-container').innerHTML = `
+                <div class="error-message">チャート生成失敗: ${data.error}</div>
+            `;
+        }
+    } catch (error) {
+        console.error('Chart error:', error);
+        app.showNotification('チャート生成失敗', 'error');
+        document.getElementById('chart-container').innerHTML = `
+            <div class="error-message">チャート生成失敗: ${error.message}</div>
+        `;
     }
 }
 
@@ -534,18 +1301,162 @@ async function showChart(chartType) {
     }
 }
 
+async function loadRetailSampleData() {
+    const sampleData = {
+        data: [
+            {
+                sales_date: '2024-01-01T00:00:00Z',
+                store: 'STORE_001',
+                sku: 'SKU_001',
+                desc: '商品A - プレミアム商品',
+                div: 'DIV_FOOD',
+                div_desc: '食品事業部',
+                dept: 'DEPT_SNACK',
+                dept_desc: 'スナック部門',
+                sold_qty: 150,
+                act_sales: 1500.0,
+                price: 10.0,
+                promotion: false,
+                promotion_discount: 0.0,
+                weather_condition: 'sunny',
+                seasonality_factor: 1.0
+            },
+            {
+                sales_date: '2024-01-02T00:00:00Z',
+                store: 'STORE_001',
+                sku: 'SKU_001',
+                desc: '商品A - プレミアム商品',
+                div: 'DIV_FOOD',
+                div_desc: '食品事業部',
+                dept: 'DEPT_SNACK',
+                dept_desc: 'スナック部門',
+                sold_qty: 180,
+                act_sales: 1620.0,
+                price: 9.0,
+                promotion: true,
+                promotion_discount: 0.1,
+                weather_condition: 'cloudy',
+                seasonality_factor: 1.1
+            },
+            {
+                sales_date: '2024-01-03T00:00:00Z',
+                store: 'STORE_001',
+                sku: 'SKU_002',
+                desc: '商品B - スタンダード商品',
+                div: 'DIV_BEVERAGE',
+                div_desc: '飲料事業部',
+                dept: 'DEPT_SOFT_DRINK',
+                dept_desc: 'ソフトドリンク部門',
+                sold_qty: 95,
+                act_sales: 950.0,
+                price: 10.0,
+                promotion: false,
+                promotion_discount: 0.0,
+                weather_condition: 'rainy',
+                seasonality_factor: 0.9
+            },
+            {
+                sales_date: '2024-01-01T00:00:00Z',
+                store: 'STORE_002',
+                sku: 'SKU_001',
+                desc: '商品A - プレミアム商品',
+                div: 'DIV_FOOD',
+                div_desc: '食品事業部',
+                dept: 'DEPT_SNACK',
+                dept_desc: 'スナック部門',
+                sold_qty: 120,
+                act_sales: 1200.0,
+                price: 10.0,
+                promotion: false,
+                promotion_discount: 0.0,
+                weather_condition: 'sunny',
+                seasonality_factor: 1.0
+            },
+            {
+                sales_date: '2024-01-02T00:00:00Z',
+                store: 'STORE_002',
+                sku: 'SKU_002',
+                desc: '商品B - スタンダード商品',
+                div: 'DIV_BEVERAGE',
+                div_desc: '飲料事業部',
+                dept: 'DEPT_SOFT_DRINK',
+                dept_desc: 'ソフトドリンク部門',
+                sold_qty: 200,
+                act_sales: 1800.0,
+                price: 9.0,
+                promotion: true,
+                promotion_discount: 0.1,
+                weather_condition: 'cloudy',
+                seasonality_factor: 1.1
+            }
+        ]
+    };
+
+    try {
+        const response = await fetch('/api/data/upload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(sampleData)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            app.showNotification('小売サンプルデータが読み込まれました！', 'success');
+            document.getElementById('upload-result').innerHTML = `
+                <div class="success-message">
+                    <h4>小売サンプルデータ読み込み完了!</h4>
+                    <p>${data.message}</p>
+                    <div class="enhanced-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-store"></i></div>
+                            <div class="stat-number">${data.statistics.unique_stores || 0}</div>
+                            <div class="stat-description">店舗数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                            <div class="stat-number">${data.statistics.unique_skus || 0}</div>
+                            <div class="stat-description">SKU数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-yen-sign"></i></div>
+                            <div class="stat-number">¥${(data.statistics.sales_stats.total_sales || 0).toLocaleString()}</div>
+                            <div class="stat-description">総売上</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-tags"></i></div>
+                            <div class="stat-number">${data.statistics.promotion_stats.total_promotion_days || 0}</div>
+                            <div class="stat-description">プロモーション日数</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Load stores after successful data upload
+            app.loadStores();
+        } else {
+            app.showNotification(data.error || 'サンプルデータの読み込みに失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Sample data error:', error);
+        app.showNotification('サンプルデータの読み込みに失敗しました', 'error');
+    }
+}
+
 // Global app instance
 let app;
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    app = new DemandPredictionApp();
+    app = new StoreDemandPredictionApp();
 });
 
 // Global error handler
 window.addEventListener('error', (event) => {
     console.error('Global error:', event.error);
     if (app) {
-        app.showNotification('An unexpected error occurred.', 'error');
+        app.showNotification('予期しないエラーが発生しました。', 'error');
     }
 });
